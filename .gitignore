@@ -24,9 +24,46 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Environment
 .env
+.env.*
+!.env.example
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+bin/
+build/
+dist/
+out/
+target/
+release/
+tmp/
+temp/
+
+# Archives and packaged artifacts
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Documentation output
+docs/
