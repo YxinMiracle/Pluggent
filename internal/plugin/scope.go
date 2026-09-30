@@ -53,6 +53,7 @@ func (s *Scope) AddCleanup(cleanup Cleanup) error {
 // Close 按注册顺序的相反顺序执行全部清理函数。
 func (s *Scope) Close(ctx context.Context) error {
 	s.mu.Lock()
+
 	if s.closed {
 		err := s.closeErr
 		s.mu.Unlock()
