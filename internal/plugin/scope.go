@@ -1,0 +1,104 @@
+package plugin
+
+import (
+	"context"
+	"errors"
+	"sync"
+)
+
+// Cleanup 定义插件卸载时执行的清理函数。
+type Cleanup func(ctx context.Context) error
+
+// ErrScopeClosed 表示插件的作用域已经关闭。
+var ErrScopeClosed = errors.New("plugin scope is closed")
+
+// ErrNilCleanup 表示传入了空的清理函数。
+var ErrNilCleanup = errors.New("cleanup must not be nil")
+
+// Scope 持有一个插件注册的清理函数。
+type Scope struct {
+	mu        sync.Mutex
+	cleanups  []Cleanup
+	closed    bool
+	closeDone chan struct{}
+	closeErr  error
+}
+
+// NewScope 创建一个插件作用域。
+func NewScope() *Scope {
+	return &Scope{
+		closeDone: make(chan struct{}),
+	}
+}
+
+// AddCleanup 注册一个插件卸载时执行的清理函数。
+func (s *Scope) AddCleanup(cleanup Cleanup) error {
+	if cleanup == nil {
+		return ErrNilCleanup
+	}
+
+	s.mu.Lock()
+
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return ErrScopeClosed
+	}
+
+	s.cleanups = append(s.cleanups, cleanup)
+
+	return nil
+}
+
+// Close 按注册顺序的相反顺序执行全部清理函数。
+func (s *Scope) Close(ctx context.Context) error {
+	s.mu.Lock()
+
+	done := s.ensureCloseDone()
+
+	if s.closed {
+		s.mu.Unlock()
+
+		select {
+		case <-done:
+			s.mu.Lock()
+			err := s.closeErr
+			s.mu.Unlock()
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	s.closed = true
+	cleanups := append([]Cleanup(nil), s.cleanups...)
+	s.cleanups = nil
+
+	s.mu.Unlock()
+
+	var cleanupErrors []error
+
+	for index := len(cleanups) - 1; index >= 0; index-- {
+		if err := cleanups[index](ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+	}
+
+	closeErr := errors.Join(cleanupErrors...)
+
+	s.mu.Lock()
+	s.closeErr = closeErr
+	close(done)
+	s.mu.Unlock()
+
+	return closeErr
+
+}
+
+func (s *Scope) ensureCloseDone() chan struct{} {
+	if s.closeDone == nil {
+		s.closeDone = make(chan struct{})
+	}
+
+	return s.closeDone
+}
