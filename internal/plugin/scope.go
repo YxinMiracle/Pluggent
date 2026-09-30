@@ -41,7 +41,6 @@ func (s *Scope) AddCleanup(cleanup Cleanup) error {
 	s.mu.Lock()
 
 	defer s.mu.Unlock()
-
 	if s.closing || s.closed {
 		return ErrScopeClosed
 	}
@@ -54,7 +53,6 @@ func (s *Scope) AddCleanup(cleanup Cleanup) error {
 // Close 按注册顺序的相反顺序执行全部清理函数。
 func (s *Scope) Close(ctx context.Context) error {
 	s.mu.Lock()
-
 	if s.closed {
 		err := s.closeErr
 		s.mu.Unlock()
@@ -76,7 +74,6 @@ func (s *Scope) Close(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
-
 	s.closing = true
 	cleanups := append([]Cleanup(nil), s.cleanups...)
 	s.cleanups = nil
@@ -99,7 +96,6 @@ func (s *Scope) Close(ctx context.Context) error {
 			cleanupErrors = append(cleanupErrors, err)
 		}
 	}
-
 	closeErr = errors.Join(cleanupErrors...)
 
 	return closeErr
