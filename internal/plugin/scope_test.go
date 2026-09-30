@@ -56,6 +56,65 @@ func TestScopeCloseIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestScopeCloseReturnsStoredResultAfterCompletion(t *testing.T) {
+	scope := NewScope()
+	cleanupErr := errors.New("cleanup failed")
+
+	err := scope.AddCleanup(func(context.Context) error {
+		return cleanupErr
+	})
+	if err != nil {
+		t.Fatalf("AddCleanup() error = %v", err)
+	}
+
+	firstErr := scope.Close(context.Background())
+	if !errors.Is(firstErr, cleanupErr) {
+		t.Fatalf("first Close() error = %v, want cleanup error", firstErr)
+	}
+
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	secondErr := scope.Close(canceledCtx)
+	if secondErr != firstErr {
+		t.Fatalf("second Close() error = %v, want stored error %v", secondErr, firstErr)
+	}
+}
+
+func TestScopeCloseHonorsCancellationWhileClosing(t *testing.T) {
+	scope := NewScope()
+	cleanupStarted := make(chan struct{})
+	releaseCleanup := make(chan struct{})
+
+	err := scope.AddCleanup(func(context.Context) error {
+		close(cleanupStarted)
+		<-releaseCleanup
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("AddCleanup() error = %v", err)
+	}
+
+	firstCloseDone := make(chan error, 1)
+	go func() {
+		firstCloseDone <- scope.Close(context.Background())
+	}()
+
+	<-cleanupStarted
+
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := scope.Close(canceledCtx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Close() error = %v, want context.Canceled", err)
+	}
+
+	close(releaseCleanup)
+	if err := <-firstCloseDone; err != nil {
+		t.Fatalf("first Close() error = %v", err)
+	}
+}
+
 func TestScopeCloseContinuesAfterCleanupError(t *testing.T) {
 	scope := NewScope()
 	firstErr := errors.New("first cleanup failed")

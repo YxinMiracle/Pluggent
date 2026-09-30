@@ -19,6 +19,7 @@ var ErrNilCleanup = errors.New("cleanup must not be nil")
 type Scope struct {
 	mu        sync.Mutex
 	cleanups  []Cleanup
+	closing   bool
 	closed    bool
 	closeDone chan struct{}
 	closeErr  error
@@ -41,7 +42,7 @@ func (s *Scope) AddCleanup(cleanup Cleanup) error {
 
 	defer s.mu.Unlock()
 
-	if s.closed {
+	if s.closing || s.closed {
 		return ErrScopeClosed
 	}
 
@@ -54,9 +55,15 @@ func (s *Scope) AddCleanup(cleanup Cleanup) error {
 func (s *Scope) Close(ctx context.Context) error {
 	s.mu.Lock()
 
+	if s.closed {
+		err := s.closeErr
+		s.mu.Unlock()
+		return err
+	}
+
 	done := s.ensureCloseDone()
 
-	if s.closed {
+	if s.closing {
 		s.mu.Unlock()
 
 		select {
@@ -70,7 +77,7 @@ func (s *Scope) Close(ctx context.Context) error {
 		}
 	}
 
-	s.closed = true
+	s.closing = true
 	cleanups := append([]Cleanup(nil), s.cleanups...)
 	s.cleanups = nil
 
@@ -88,6 +95,7 @@ func (s *Scope) Close(ctx context.Context) error {
 
 	s.mu.Lock()
 	s.closeErr = closeErr
+	s.closed = true
 	close(done)
 	s.mu.Unlock()
 
