@@ -97,6 +97,7 @@ func (s *Scope) Close(ctx context.Context) error {
 			cleanupErrors = append(cleanupErrors, err)
 		}
 	}
+
 	closeErr = errors.Join(cleanupErrors...)
 
 	return closeErr
