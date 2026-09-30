@@ -144,6 +144,38 @@ func TestScopeCloseContinuesAfterCleanupError(t *testing.T) {
 	}
 }
 
+func TestScopeCloseFinalizesAfterCleanupPanic(t *testing.T) {
+	scope := NewScope()
+	panicValue := "cleanup panic"
+
+	err := scope.AddCleanup(func(context.Context) error {
+		panic(panicValue)
+	})
+	if err != nil {
+		t.Fatalf("AddCleanup() error = %v", err)
+	}
+
+	var recovered any
+	func() {
+		defer func() {
+			recovered = recover()
+		}()
+
+		_ = scope.Close(context.Background())
+	}()
+
+	if recovered != panicValue {
+		t.Fatalf("Close() panic = %v, want %v", recovered, panicValue)
+	}
+
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := scope.Close(canceledCtx); err != nil {
+		t.Fatalf("second Close() error = %v, want stored close result", err)
+	}
+}
+
 func TestScopeRejectsCleanupAfterClose(t *testing.T) {
 	scope := NewScope()
 

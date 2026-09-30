@@ -84,6 +84,15 @@ func (s *Scope) Close(ctx context.Context) error {
 	s.mu.Unlock()
 
 	var cleanupErrors []error
+	var closeErr error
+
+	defer func() {
+		s.mu.Lock()
+		s.closeErr = closeErr
+		s.closed = true
+		close(done)
+		s.mu.Unlock()
+	}()
 
 	for index := len(cleanups) - 1; index >= 0; index-- {
 		if err := cleanups[index](ctx); err != nil {
@@ -91,13 +100,7 @@ func (s *Scope) Close(ctx context.Context) error {
 		}
 	}
 
-	closeErr := errors.Join(cleanupErrors...)
-
-	s.mu.Lock()
-	s.closeErr = closeErr
-	s.closed = true
-	close(done)
-	s.mu.Unlock()
+	closeErr = errors.Join(cleanupErrors...)
 
 	return closeErr
 
