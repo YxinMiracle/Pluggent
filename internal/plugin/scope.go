@@ -15,10 +15,11 @@ var ErrScopeClosed = errors.New("plugin scope is closed")
 // ErrNilCleanup 表示传入了空的清理函数。
 var ErrNilCleanup = errors.New("cleanup must not be nil")
 
-// Scope 持有一个插件注册的清理函数。
+// Scope 持有一个插件注册的清理函数，并连接到组合共享的服务注册表。
 type Scope struct {
 	mu        sync.Mutex
 	cleanups  []Cleanup
+	registry  *serviceRegistry
 	closing   bool
 	closed    bool
 	closeDone chan struct{}
@@ -27,9 +28,22 @@ type Scope struct {
 
 // NewScope 创建一个插件作用域。
 func NewScope() *Scope {
+	return newScope(newServiceRegistry())
+}
+
+func newScope(registry *serviceRegistry) *Scope {
 	return &Scope{
+		registry:  registry,
 		closeDone: make(chan struct{}),
 	}
+}
+
+func (s *Scope) ensureServiceRegistry() *serviceRegistry {
+	if s.registry == nil {
+		s.registry = newServiceRegistry()
+	}
+
+	return s.registry
 }
 
 // AddCleanup 注册一个插件卸载时执行的清理函数。
