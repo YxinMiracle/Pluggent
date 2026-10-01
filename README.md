@@ -1,5 +1,5 @@
 <h1 align="center">Pluggent</h1>
-<p align="center">用 Go 从零构建一切皆插件的 Agent Harness。</p>
+<p align="center">从插件内核开始，用 Go 逐步构建一切皆插件的 Agent Harness。</p>
 <p align="center"><a href="README.md">简体中文</a> · <a href="README.en.md">English</a></p>
 
 > 当前阶段：插件内核与配置组合已可运行。Agent loop、模型、工具和 Skill 尚未实现。
