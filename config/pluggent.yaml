@@ -1,0 +1,3 @@
+plugins:
+  - id: runtime-info-provider
+  - id: version-reporter
